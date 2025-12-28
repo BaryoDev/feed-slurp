@@ -32,13 +32,29 @@ export function parseRss(doc: Document): SlurpFeed {
 }
 
 function extractThumbnail(item: Element, content: string): string | null {
-    // Try media:content or media:thumbnail
-    const media = item.querySelector("media\\:content, media\\:thumbnail, enclosure[type^='image']");
-    if (media) {
-        return media.getAttribute("url") || media.getAttribute("src");
+    // 1. Try media:content or media:thumbnail (standard RSS extensions)
+    // We check both namespaced and plain tags to be safe
+    const mediaTags = ["media\\:content", "media\\:thumbnail", "content", "thumbnail"];
+    for (const tag of mediaTags) {
+        const el = item.querySelector(tag);
+        if (el) {
+            const url = el.getAttribute("url") || el.getAttribute("src");
+            if (url) return url;
+        }
     }
 
-    // Fallback: extract first img from content
-    const match = content.match(/<img[^>]+src="([^">]+)"/);
-    return match ? match[1] : null;
+    // 2. Try enclosure tag (common for podcasts/media feeds)
+    const enclosure = item.querySelector("enclosure[type^='image']");
+    if (enclosure) {
+        const url = enclosure.getAttribute("url");
+        if (url) return url;
+    }
+
+    // 3. Fallback: extract first img from content using a more flexible regex
+    // This handles both single and double quotes, and various spacing
+    const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
+    const match = content.match(imgRegex);
+    if (match && match[1]) return match[1];
+
+    return null;
 }

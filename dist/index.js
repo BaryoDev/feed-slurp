@@ -109,12 +109,23 @@ function parseRss(doc) {
   };
 }
 function extractThumbnail(item, content) {
-  const media = item.querySelector("media\\:content, media\\:thumbnail, enclosure[type^='image']");
-  if (media) {
-    return media.getAttribute("url") || media.getAttribute("src");
+  const mediaTags = ["media\\:content", "media\\:thumbnail", "content", "thumbnail"];
+  for (const tag of mediaTags) {
+    const el = item.querySelector(tag);
+    if (el) {
+      const url = el.getAttribute("url") || el.getAttribute("src");
+      if (url) return url;
+    }
   }
-  const match = content.match(/<img[^>]+src="([^">]+)"/);
-  return match ? match[1] : null;
+  const enclosure = item.querySelector("enclosure[type^='image']");
+  if (enclosure) {
+    const url = enclosure.getAttribute("url");
+    if (url) return url;
+  }
+  const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
+  const match = content.match(imgRegex);
+  if (match && match[1]) return match[1];
+  return null;
 }
 
 // src/parser/atom.ts
