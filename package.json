@@ -1,0 +1,39 @@
+{
+    "name": "feed-slurp",
+    "version": "1.0.0",
+    "description": "A lightweight, zero-dependency (well, almost!) RSS/Atom feed fetcher and parser with built-in caching and proxy support.",
+    "main": "./dist/index.js",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+        "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+        "test": "vitest run",
+        "lint": "eslint src/**/*.ts"
+    },
+    "keywords": [
+        "rss",
+        "atom",
+        "feed",
+        "parser",
+        "fetcher",
+        "proxy",
+        "cache",
+        "slurp"
+    ],
+    "author": "Arnel I. Robles",
+    "license": "MPL-2.0",
+    "dependencies": {
+        "nano-safe-storage": "^1.0.0",
+        "resilient-fetcher": "^1.0.0"
+    },
+    "devDependencies": {
+        "tsup": "^8.0.0",
+        "typescript": "^5.0.0",
+        "vitest": "^1.0.0",
+        "@types/node": "^20.0.0"
+    }
+}
