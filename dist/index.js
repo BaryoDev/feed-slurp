@@ -67,15 +67,30 @@ function parseXml(xmlString) {
   }
   return doc;
 }
+function findNode(parent, selector) {
+  if (!parent) return null;
+  try {
+    const el2 = parent.querySelector(selector.replace(":", "\\:"));
+    if (el2) return el2;
+  } catch (e) {
+  }
+  if (selector.includes(":")) {
+    const [prefix, localName2] = selector.split(":");
+    const el2 = parent.getElementsByTagNameNS("*", localName2)[0];
+    if (el2) return el2;
+  }
+  const localName = selector.includes(":") ? selector.split(":")[1] : selector;
+  const el = parent.getElementsByTagName(localName)[0];
+  return el || null;
+}
 function getText(node, selector) {
-  if (!node) return "";
-  const el = node.querySelector(selector);
+  const el = node instanceof Document ? findNode(node, selector) : findNode(node, selector);
   return el?.textContent?.trim() || "";
 }
 function getCDataOrText(node, selectors) {
   if (!node) return "";
   for (const selector of selectors) {
-    const el = node.querySelector(selector.replace(":", "\\:"));
+    const el = findNode(node, selector);
     if (el) return el.textContent?.trim() || "";
   }
   return "";
@@ -86,15 +101,18 @@ function parseRss(doc) {
   const channel = doc.querySelector("channel");
   if (!channel) throw new Error("Invalid RSS feed: Missing <channel>");
   const items = Array.from(doc.querySelectorAll("item")).map((item) => {
-    const description = getText(item, "description");
-    const content = getCDataOrText(item, ["content:encoded", "description"]);
+    let description = getText(item, "description");
+    const content = getCDataOrText(item, ["content:encoded", "description", "summary"]);
+    if (!description && content) {
+      description = content.replace(/<[^>]+>/g, "").substring(0, 160).trim() + "...";
+    }
     return {
       title: getText(item, "title"),
       link: getText(item, "link"),
       pubDate: new Date(getText(item, "pubDate")).toISOString(),
       description,
       content,
-      author: getText(item, "dc\\:creator") || "Unknown",
+      author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",
       categories: Array.from(item.querySelectorAll("category")).map((c) => c.textContent || ""),
       guid: getText(item, "guid") || getText(item, "link"),
       thumbnail: extractThumbnail(item, content)
@@ -111,7 +129,7 @@ function parseRss(doc) {
 function extractThumbnail(item, content) {
   const mediaTags = ["media\\:content", "media\\:thumbnail", "content", "thumbnail"];
   for (const tag of mediaTags) {
-    const el = item.querySelector(tag);
+    const el = findNode(item, tag);
     if (el) {
       const url = el.getAttribute("url") || el.getAttribute("src");
       if (url) return url;

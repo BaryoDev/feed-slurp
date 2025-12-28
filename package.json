@@ -1,6 +1,6 @@
 {
     "name": "feed-slurp",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "A lightweight, zero-dependency (well, almost!) RSS/Atom feed fetcher and parser with built-in caching and proxy support.",
     "main": "./dist/index.js",
     "module": "./dist/index.mjs",
