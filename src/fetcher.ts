@@ -1,5 +1,6 @@
 import { resilientFetch } from "resilient-fetcher";
 import { SlurpOptions } from "./types";
+import { safeUrl } from "./parser/text";
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -72,11 +73,11 @@ export async function fetchFeedXml(url: string, options: SlurpOptions = {}): Pro
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`Failed to fetch feed ${url}: ${message}`);
+        throw new Error(`Failed to fetch feed ${safeUrl(url)}: ${message}`);
     }
 
     if (!response.ok) {
-        throw new Error(`Failed to fetch feed ${url}: ${response.status} ${response.statusText}`.trim());
+        throw new Error(`Failed to fetch feed ${safeUrl(url)}: ${response.status} ${response.statusText}`.trim());
     }
 
     return readBody(response, maxBytes, timeout);

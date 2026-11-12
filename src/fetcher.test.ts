@@ -64,4 +64,12 @@ describe("fetchFeedXml", () => {
         mocked.mockResolvedValue(res);
         await expect(fetchFeedXml("https://x/f", { maxBytes: 1000 })).rejects.toThrow(/larger than 1000/);
     });
+
+    it("keeps the query string and userinfo out of error messages", async () => {
+        mocked.mockRejectedValue(new Error("boom"));
+        const err = await fetchFeedXml("https://user:pw@x.test/f.xml?token=SECRET").catch((e) => e);
+
+        expect(err.message).toContain("https://x.test/f.xml");
+        expect(err.message).not.toMatch(/SECRET|user|pw@/);
+    });
 });

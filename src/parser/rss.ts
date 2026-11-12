@@ -1,13 +1,13 @@
 import { SlurpFeed, SlurpItem } from "../types";
 import { getCDataOrText, getText, findNode } from "./xml";
 import { toIsoDate } from "./date";
-import { baseFor, htmlToText, resolveUrl } from "./text";
+import { baseFor, fallbackGuid, htmlToText, resolveUrl } from "./text";
 
 export function parseRss(doc: Document, feedUrl?: string): SlurpFeed {
     const channel = doc.querySelector("channel");
     if (!channel) throw new Error("Invalid RSS feed: Missing <channel>");
 
-    const items: SlurpItem[] = Array.from(doc.querySelectorAll("item")).map((item) => {
+    const items: SlurpItem[] = Array.from(doc.querySelectorAll("item")).map((item, index) => {
         let description = htmlToText(getText(item, "description"));
         const content = getCDataOrText(item, ["content:encoded", "description", "summary"]);
 
@@ -19,15 +19,18 @@ export function parseRss(doc: Document, feedUrl?: string): SlurpFeed {
         const linkEl = findNode(item, "link");
         const link = resolveUrl(getText(item, "link"), baseFor(linkEl, feedUrl)) ?? "";
 
+        const title = getText(item, "title");
+        const pubDate = toIsoDate(getText(item, "pubDate"));
+
         return {
-            title: getText(item, "title"),
+            title,
             link,
-            pubDate: toIsoDate(getText(item, "pubDate")),
+            pubDate,
             description,
             content,
             author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",
             categories: Array.from(item.querySelectorAll("category")).map(c => c.textContent || ""),
-            guid: getText(item, "guid") || link,
+            guid: getText(item, "guid") || link || fallbackGuid(title, pubDate, index),
             thumbnail: extractThumbnail(item, content, feedUrl)
         };
     });

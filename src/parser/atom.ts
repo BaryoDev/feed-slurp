@@ -1,7 +1,7 @@
 import { SlurpFeed, SlurpItem } from "../types";
 import { getText } from "./xml";
 import { toIsoDate } from "./date";
-import { baseFor, htmlToText, resolveUrl } from "./text";
+import { baseFor, fallbackGuid, htmlToText, resolveUrl } from "./text";
 
 /** The entry or feed link: rel="alternate", then a link with no rel (alternate by RFC 4287). Never self, replies or other rels. */
 function alternateLink(parent: Element, feedUrl?: string): string {
@@ -16,18 +16,21 @@ export function parseAtom(doc: Document, feedUrl?: string): SlurpFeed {
     const feed = doc.querySelector("feed");
     if (!feed) throw new Error("Invalid Atom feed: Missing <feed>");
 
-    const items: SlurpItem[] = Array.from(doc.querySelectorAll("entry")).map((entry) => {
+    const items: SlurpItem[] = Array.from(doc.querySelectorAll("entry")).map((entry, index) => {
         const content = getText(entry, "content") || getText(entry, "summary");
 
+        const title = getText(entry, "title");
+        const pubDate = toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published"));
+
         return {
-            title: getText(entry, "title"),
+            title,
             link: alternateLink(entry, feedUrl),
-            pubDate: toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published")),
+            pubDate,
             description: htmlToText(getText(entry, "summary")),
             content,
             author: getText(entry, "author name") || "Unknown",
             categories: Array.from(entry.querySelectorAll("category")).map(c => c.getAttribute("term") || ""),
-            guid: getText(entry, "id"),
+            guid: getText(entry, "id") || fallbackGuid(title, pubDate, index),
             thumbnail: extractThumbnail(entry, content, feedUrl)
         };
     });

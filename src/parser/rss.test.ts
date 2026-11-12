@@ -116,7 +116,7 @@ describe("RSS Parser", () => {
     expect(feed.items[0].thumbnail).toBe("https://blog.test/a/img/a.png");
     expect(feed.items[1].link).toBe("");
     expect(feed.items[1].thumbnail).toBeNull();
-    expect(feed.items[1].guid).toBe("");
+    expect(feed.items[1].guid).not.toBe("");
     expect(feed.items[2].link).toBe("");
     expect(feed.items[2].thumbnail).toBeNull();
   });
@@ -149,5 +149,21 @@ describe("RSS Parser", () => {
 
     expect(feed.title).toBe("a\u00a0b \u00a9 2024 \u2014 & \u00a9");
     expect(feed.items[0].content).toBe("keep &nbsp; raw");
+  });
+
+  it("gives items with no guid and no usable link different guids", () => {
+    const xml = `
+      <rss version="2.0">
+        <channel>
+          <item><title>Same</title><link>javascript:a</link></item>
+          <item><title>Same</title><link>javascript:b</link></item>
+          <item><link>javascript:c</link></item>
+        </channel>
+      </rss>
+    `;
+    const guids = parseRss(parseXml(xml)).items.map((i) => i.guid);
+
+    expect(guids.every((g) => g !== "")).toBe(true);
+    expect(new Set(guids).size).toBe(3);
   });
 });

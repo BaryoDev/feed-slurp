@@ -59,3 +59,18 @@ export function resolveUrl(value: string | null | undefined, base?: string): str
         return raw;
     }
 }
+
+/** A stable id for an item with no guid and no usable link: title, date and position in the feed. */
+export function fallbackGuid(title: string, pubDate: string | null, index: number): string {
+    return `${title}|${pubDate ?? ""}#${index}`;
+}
+
+/** Origin plus pathname only, so tokens in the query string or userinfo stay out of messages. */
+export function safeUrl(url: string): string {
+    try {
+        const u = new URL(url);
+        return u.origin + u.pathname;
+    } catch {
+        return "the feed";
+    }
+}
