@@ -1,5 +1,59 @@
 // src/fetcher.ts
 import { resilientFetch } from "resilient-fetcher";
+
+// src/parser/text.ts
+var UNSAFE_SCHEME = /^(javascript|data|vbscript):/i;
+var XML_NS = "http://www.w3.org/XML/1998/namespace";
+function htmlToText(html) {
+  if (!html) return "";
+  const stripped = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "").replace(/<[^>]+>/g, "");
+  const doc = new DOMParser().parseFromString(stripped, "text/html");
+  return (doc.body?.textContent || "").trim();
+}
+function xmlBase(el) {
+  return el.getAttributeNS(XML_NS, "base") || el.getAttribute("xml:base");
+}
+function baseFor(el, feedUrl) {
+  const bases = [];
+  for (let node = el; node; node = node.parentElement) {
+    const b = xmlBase(node);
+    if (b) bases.unshift(b);
+  }
+  let base = feedUrl;
+  for (const b of bases) {
+    try {
+      base = new URL(b, base).href;
+    } catch {
+    }
+  }
+  return base;
+}
+function resolveUrl(value, base) {
+  const raw = (value || "").trim();
+  if (!raw) return null;
+  const compact = raw.replace(/[\u0000- ]/g, "");
+  if (UNSAFE_SCHEME.test(compact)) return null;
+  if (!base) return raw;
+  try {
+    const href = new URL(raw, base).href;
+    return UNSAFE_SCHEME.test(href) ? null : href;
+  } catch {
+    return raw;
+  }
+}
+function fallbackGuid(title, pubDate, index) {
+  return `${title}|${pubDate ?? ""}#${index}`;
+}
+function safeUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    return "the feed";
+  }
+}
+
+// src/fetcher.ts
 var DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 async function readBody(response, maxBytes, timeout) {
   const tooLarge = () => new Error(`Feed is larger than ${maxBytes} bytes`);
@@ -65,10 +119,10 @@ async function fetchFeedXml(url, options = {}) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to fetch feed ${url}: ${message}`);
+    throw new Error(`Failed to fetch feed ${safeUrl(url)}: ${message}`);
   }
   if (!response.ok) {
-    throw new Error(`Failed to fetch feed ${url}: ${response.status} ${response.statusText}`.trim());
+    throw new Error(`Failed to fetch feed ${safeUrl(url)}: ${response.status} ${response.statusText}`.trim());
   }
   return readBody(response, maxBytes, timeout);
 }
@@ -176,52 +230,11 @@ function toIsoDate(value) {
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
-// src/parser/text.ts
-var UNSAFE_SCHEME = /^(javascript|data|vbscript):/i;
-var XML_NS = "http://www.w3.org/XML/1998/namespace";
-function htmlToText(html) {
-  if (!html) return "";
-  const stripped = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "").replace(/<[^>]+>/g, "");
-  const doc = new DOMParser().parseFromString(stripped, "text/html");
-  return (doc.body?.textContent || "").trim();
-}
-function xmlBase(el) {
-  return el.getAttributeNS(XML_NS, "base") || el.getAttribute("xml:base");
-}
-function baseFor(el, feedUrl) {
-  const bases = [];
-  for (let node = el; node; node = node.parentElement) {
-    const b = xmlBase(node);
-    if (b) bases.unshift(b);
-  }
-  let base = feedUrl;
-  for (const b of bases) {
-    try {
-      base = new URL(b, base).href;
-    } catch {
-    }
-  }
-  return base;
-}
-function resolveUrl(value, base) {
-  const raw = (value || "").trim();
-  if (!raw) return null;
-  const compact = raw.replace(/[\u0000- ]/g, "");
-  if (UNSAFE_SCHEME.test(compact)) return null;
-  if (!base) return raw;
-  try {
-    const href = new URL(raw, base).href;
-    return UNSAFE_SCHEME.test(href) ? null : href;
-  } catch {
-    return raw;
-  }
-}
-
 // src/parser/rss.ts
 function parseRss(doc, feedUrl) {
   const channel = doc.querySelector("channel");
   if (!channel) throw new Error("Invalid RSS feed: Missing <channel>");
-  const items = Array.from(doc.querySelectorAll("item")).map((item) => {
+  const items = Array.from(doc.querySelectorAll("item")).map((item, index) => {
     let description = htmlToText(getText(item, "description"));
     const content = getCDataOrText(item, ["content:encoded", "description", "summary"]);
     if (!description && content) {
@@ -229,15 +242,17 @@ function parseRss(doc, feedUrl) {
     }
     const linkEl = findNode(item, "link");
     const link = resolveUrl(getText(item, "link"), baseFor(linkEl, feedUrl)) ?? "";
+    const title = getText(item, "title");
+    const pubDate = toIsoDate(getText(item, "pubDate"));
     return {
-      title: getText(item, "title"),
+      title,
       link,
-      pubDate: toIsoDate(getText(item, "pubDate")),
+      pubDate,
       description,
       content,
       author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",
       categories: Array.from(item.querySelectorAll("category")).map((c) => c.textContent || ""),
-      guid: getText(item, "guid") || link,
+      guid: getText(item, "guid") || link || fallbackGuid(title, pubDate, index),
       thumbnail: extractThumbnail(item, content, feedUrl)
     };
   });
@@ -279,17 +294,19 @@ function alternateLink(parent, feedUrl) {
 function parseAtom(doc, feedUrl) {
   const feed = doc.querySelector("feed");
   if (!feed) throw new Error("Invalid Atom feed: Missing <feed>");
-  const items = Array.from(doc.querySelectorAll("entry")).map((entry) => {
+  const items = Array.from(doc.querySelectorAll("entry")).map((entry, index) => {
     const content = getText(entry, "content") || getText(entry, "summary");
+    const title = getText(entry, "title");
+    const pubDate = toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published"));
     return {
-      title: getText(entry, "title"),
+      title,
       link: alternateLink(entry, feedUrl),
-      pubDate: toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published")),
+      pubDate,
       description: htmlToText(getText(entry, "summary")),
       content,
       author: getText(entry, "author name") || "Unknown",
       categories: Array.from(entry.querySelectorAll("category")).map((c) => c.getAttribute("term") || ""),
-      guid: getText(entry, "id"),
+      guid: getText(entry, "id") || fallbackGuid(title, pubDate, index),
       thumbnail: extractThumbnail2(entry, content, feedUrl)
     };
   });
