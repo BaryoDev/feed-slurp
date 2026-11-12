@@ -1,7 +1,7 @@
 interface SlurpItem {
     title: string;
     link: string;
-    pubDate: string;
+    pubDate: string | null;
     description: string;
     content: string;
     author: string;
