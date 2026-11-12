@@ -1,7 +1,7 @@
 export interface SlurpItem {
     title: string;
     link: string;
-    pubDate: string; // ISO format
+    pubDate: string | null; // ISO format, null when missing or unparseable
     description: string;
     content: string;
     author: string;

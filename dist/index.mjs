@@ -68,6 +68,13 @@ function getCDataOrText(node, selectors) {
   return "";
 }
 
+// src/parser/date.ts
+function toIsoDate(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : new Date(time).toISOString();
+}
+
 // src/parser/rss.ts
 function parseRss(doc) {
   const channel = doc.querySelector("channel");
@@ -81,7 +88,7 @@ function parseRss(doc) {
     return {
       title: getText(item, "title"),
       link: getText(item, "link"),
-      pubDate: new Date(getText(item, "pubDate")).toISOString(),
+      pubDate: toIsoDate(getText(item, "pubDate")),
       description,
       content,
       author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",
@@ -127,7 +134,7 @@ function parseAtom(doc) {
     return {
       title: getText(entry, "title"),
       link: entry.querySelector("link[rel='alternate']")?.getAttribute("href") || entry.querySelector("link")?.getAttribute("href") || "",
-      pubDate: new Date(getText(entry, "updated") || getText(entry, "published")).toISOString(),
+      pubDate: toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published")),
       description: getText(entry, "summary"),
       content,
       author: getText(entry, "author name") || "Unknown",

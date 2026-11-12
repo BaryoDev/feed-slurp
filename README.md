@@ -8,7 +8,7 @@ A lightweight, universal RSS and Atom feed fetcher for the browser. Targeted for
 - **BaryoDev Powered**: Leverages `resilient-fetcher` for automatic retries and `nano-safe-storage` for robust caching.
 - **Normalized Schema**: No more worrying about the differences between RSS item tags and Atom entry tags. One clean JSON schema for everything.
 - **CORS Friendly**: Built-in support for popular proxies to bypass browser restrictions.
-- **Smart Cache**: Stale-while-revalidate inspired behavior via `localStorage`.
+- **Smart Cache**: Plain TTL cache via `localStorage`.
 
 ## Installation
 
@@ -77,7 +77,7 @@ interface SlurpFeed {
 interface SlurpItem {
   title: string;
   link: string;
-  pubDate: string;        // ISO 8601 string
+  pubDate: string | null; // ISO 8601 string, null if missing or unparseable
   description: string;   // Plain text / snippet
   content: string;       // Full HTML content
   author: string;
