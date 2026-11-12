@@ -23,6 +23,7 @@ interface SlurpOptions {
     proxy?: string | ((url: string) => string);
     timeout?: number;
     retries?: number;
+    maxBytes?: number;
 }
 
 declare function clearSlurpCache(key?: string): void;

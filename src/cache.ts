@@ -11,7 +11,8 @@ export function getCachedFeed(key: string): SlurpFeed | null {
 }
 
 export function setCachedFeed(key: string, feed: SlurpFeed, ttl?: number): void {
-    storage.set(key, feed, ttl ? { ttl } : undefined);
+    if (ttl !== undefined && ttl <= 0) return; // 0 means do not cache
+    storage.set(key, feed, ttl !== undefined ? { ttl } : undefined);
 }
 
 export function clearSlurpCache(key?: string): void {

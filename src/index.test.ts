@@ -40,3 +40,31 @@ describe("Slurp Integration", () => {
         expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 });
+
+describe("Slurp options", () => {
+    const rssXml = `<rss version="2.0"><channel><title>T</title></channel></rss>`;
+
+    beforeEach(() => {
+        clearSlurpCache();
+        vi.restoreAllMocks();
+    });
+
+    it("does not cache when cacheTTL is 0", async () => {
+        const fetchSpy = vi.spyOn(fetcher, "fetchFeedXml").mockResolvedValue(rssXml);
+
+        await slurp("https://test.com/zero", { cacheTTL: 0 });
+        await slurp("https://test.com/zero", { cacheTTL: 0 });
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        expect(localStorage.getItem("slurp_https://test.com/zero")).toBeNull();
+    });
+
+    it("resolves relative links against the feed url, not the proxy", async () => {
+        const xml = `<rss version="2.0"><channel><title>T</title><item><title>A</title><link>/posts/1</link></item></channel></rss>`;
+        vi.spyOn(fetcher, "fetchFeedXml").mockResolvedValue(xml);
+
+        const feed = await slurp("https://blog.test/feed.xml", { cache: false, proxy: "corsproxy" });
+
+        expect(feed.items[0].link).toBe("https://blog.test/posts/1");
+    });
+});
