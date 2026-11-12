@@ -68,4 +68,51 @@ describe("Atom Parser", () => {
 
         expect(feed.items[0].pubDate).toBe("2024-01-01T10:00:00.000Z");
     });
+
+    it("prefers alternate, then a rel-less link, and never self or replies", () => {
+        const xml = `
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Links</title>
+          <link rel="self" href="https://x/atom"/>
+          <entry><title>A</title><link rel="replies" href="https://x/r"/><link href="https://x/e"/></entry>
+          <entry><title>B</title><link rel="self" href="https://x/s"/><link rel="alternate" href="/b"/></entry>
+          <entry><title>C</title><link rel="replies" href="https://x/r"/><link rel="enclosure" href="https://x/f.mp3"/></entry>
+        </feed>
+      `;
+        const feed = parseAtom(parseXml(xml), "https://x/atom");
+
+        expect(feed.link).toBe("");
+        expect(feed.items[0].link).toBe("https://x/e");
+        expect(feed.items[1].link).toBe("https://x/b");
+        expect(feed.items[2].link).toBe("");
+    });
+
+    it("resolves relative urls, honours xml:base and drops unsafe schemes", () => {
+        const xml = `
+        <feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://base.test/dir/">
+          <title>T</title>
+          <link href="home"/>
+          <entry><title>A</title><link href="a"/><link rel="enclosure" type="image/png" href="javascript:x"/></entry>
+          <entry><title>B</title><link href="data:text/html,x"/><link rel="enclosure" type="image/png" href="p.png"/></entry>
+        </feed>
+      `;
+        const feed = parseAtom(parseXml(xml), "https://x/atom");
+
+        expect(feed.link).toBe("https://base.test/dir/home");
+        expect(feed.items[0].link).toBe("https://base.test/dir/a");
+        expect(feed.items[0].thumbnail).toBeNull();
+        expect(feed.items[1].link).toBe("");
+        expect(feed.items[1].thumbnail).toBe("https://base.test/dir/p.png");
+    });
+
+    it("returns summary as plain text", () => {
+        const xml = `
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>T</title>
+          <entry><title>A</title><summary type="html">&lt;p&gt;Hi &lt;b&gt;you&lt;/b&gt;&lt;/p&gt;</summary></entry>
+        </feed>
+      `;
+
+        expect(parseAtom(parseXml(xml)).items[0].description).toBe("Hi you");
+    });
 });

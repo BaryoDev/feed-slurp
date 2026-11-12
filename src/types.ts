@@ -20,9 +20,10 @@ export interface SlurpFeed {
 
 export interface SlurpOptions {
     cache?: boolean;
-    cacheTTL?: number; // in seconds
+    cacheTTL?: number; // in seconds, 0 turns caching off for the call
     cacheKey?: string;
     proxy?: string | ((url: string) => string);
     timeout?: number;
     retries?: number;
+    maxBytes?: number; // largest response body to read, default 5 MB
 }

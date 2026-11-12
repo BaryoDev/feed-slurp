@@ -1,50 +1,55 @@
 import { SlurpFeed, SlurpItem } from "../types";
 import { getCDataOrText, getText, findNode } from "./xml";
 import { toIsoDate } from "./date";
+import { baseFor, htmlToText, resolveUrl } from "./text";
 
-export function parseRss(doc: Document): SlurpFeed {
+export function parseRss(doc: Document, feedUrl?: string): SlurpFeed {
     const channel = doc.querySelector("channel");
     if (!channel) throw new Error("Invalid RSS feed: Missing <channel>");
 
     const items: SlurpItem[] = Array.from(doc.querySelectorAll("item")).map((item) => {
-        let description = getText(item, "description");
+        let description = htmlToText(getText(item, "description"));
         const content = getCDataOrText(item, ["content:encoded", "description", "summary"]);
 
         // Fallback: If description is empty, use a snippet of content
         if (!description && content) {
-            description = content.replace(/<[^>]+>/g, "").substring(0, 160).trim() + "...";
+            description = htmlToText(content).substring(0, 160).trim() + "...";
         }
+
+        const linkEl = findNode(item, "link");
+        const link = resolveUrl(getText(item, "link"), baseFor(linkEl, feedUrl)) ?? "";
 
         return {
             title: getText(item, "title"),
-            link: getText(item, "link"),
+            link,
             pubDate: toIsoDate(getText(item, "pubDate")),
             description,
             content,
             author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",
             categories: Array.from(item.querySelectorAll("category")).map(c => c.textContent || ""),
-            guid: getText(item, "guid") || getText(item, "link"),
-            thumbnail: extractThumbnail(item, content)
+            guid: getText(item, "guid") || link,
+            thumbnail: extractThumbnail(item, content, feedUrl)
         };
     });
 
     return {
         title: getText(channel, "title"),
-        description: getText(channel, "description"),
-        link: getText(channel, "link"),
+        description: htmlToText(getText(channel, "description")),
+        link: resolveUrl(getText(channel, "link"), baseFor(findNode(channel, "link"), feedUrl)) ?? "",
         lastBuildDate: getText(channel, "lastBuildDate") || new Date().toISOString(),
         items
     };
 }
 
-function extractThumbnail(item: Element, content: string): string | null {
+function extractThumbnail(item: Element, content: string, feedUrl?: string): string | null {
+    const base = baseFor(item, feedUrl);
     // 1. Try media:content or media:thumbnail
     const mediaTags = ["media\\:content", "media\\:thumbnail", "content", "thumbnail"];
     for (const tag of mediaTags) {
         const el = findNode(item, tag);
         if (el) {
             const url = el.getAttribute("url") || el.getAttribute("src");
-            if (url) return url;
+            if (url) return resolveUrl(url, baseFor(el, feedUrl));
         }
     }
 
@@ -52,13 +57,13 @@ function extractThumbnail(item: Element, content: string): string | null {
     const enclosure = item.querySelector("enclosure[type^='image']");
     if (enclosure) {
         const url = enclosure.getAttribute("url");
-        if (url) return url;
+        if (url) return resolveUrl(url, baseFor(enclosure, feedUrl));
     }
 
     // 3. Fallback: extract first img from content
     const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
     const match = content.match(imgRegex);
-    if (match && match[1]) return match[1];
+    if (match && match[1]) return resolveUrl(match[1], base);
 
     return null;
 }

@@ -17,7 +17,9 @@ export async function slurp(url: string, options: SlurpOptions = {}): Promise<Sl
     const { cache = true, cacheTTL, cacheKey = url } = options;
 
     // 1. Check Cache
-    if (cache) {
+    const useCache = cache && !(cacheTTL !== undefined && cacheTTL <= 0);
+
+    if (useCache) {
         const cached = getCachedFeed(cacheKey);
         if (cached) return cached;
     }
@@ -28,10 +30,10 @@ export async function slurp(url: string, options: SlurpOptions = {}): Promise<Sl
     // 3. Parse
     const doc = parseXml(xml);
     const isAtom = doc.querySelector("feed") !== null;
-    const feed = isAtom ? parseAtom(doc) : parseRss(doc);
+    const feed = isAtom ? parseAtom(doc, url) : parseRss(doc, url);
 
     // 4. Cache Result
-    if (cache) {
+    if (useCache) {
         setCachedFeed(cacheKey, feed, cacheTTL);
     }
 

@@ -79,4 +79,75 @@ describe("RSS Parser", () => {
     expect(feed.items[1].pubDate).toBeNull();
     expect(feed.items[2].pubDate).toBeNull();
   });
+
+  it("returns description as plain text and leaves content as HTML", () => {
+    const xml = `
+      <rss version="2.0">
+        <channel>
+          <item>
+            <title>T</title>
+            <description><![CDATA[<script>alert(1)</script><b>hi</b> &amp; <i>there</i>&nbsp;now]]></description>
+          </item>
+        </channel>
+      </rss>
+    `;
+    const item = parseRss(parseXml(xml)).items[0];
+
+    expect(item.description).toBe("hi & there\u00a0now");
+    expect(item.description).not.toContain("<");
+    expect(item.content).toContain("<b>hi</b>");
+  });
+
+  it("resolves relative links and thumbnails and drops unsafe schemes", () => {
+    const xml = `
+      <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+        <channel>
+          <link>/home</link>
+          <item><title>Rel</title><link>/posts/1</link><media:thumbnail url="img/a.png"/></item>
+          <item><title>Js</title><link>javascript:alert(1)</link><media:thumbnail url="javascript:alert(3)"/></item>
+          <item><title>Data</title><link>data:text/html,x</link><enclosure type="image/png" url=" vbscript:x"/></item>
+        </channel>
+      </rss>
+    `;
+    const feed = parseRss(parseXml(xml), "https://blog.test/a/feed.xml");
+
+    expect(feed.link).toBe("https://blog.test/home");
+    expect(feed.items[0].link).toBe("https://blog.test/posts/1");
+    expect(feed.items[0].thumbnail).toBe("https://blog.test/a/img/a.png");
+    expect(feed.items[1].link).toBe("");
+    expect(feed.items[1].thumbnail).toBeNull();
+    expect(feed.items[1].guid).toBe("");
+    expect(feed.items[2].link).toBe("");
+    expect(feed.items[2].thumbnail).toBeNull();
+  });
+
+  it("honours xml:base", () => {
+    const xml = `
+      <rss version="2.0">
+        <channel xml:base="https://cdn.test/root/">
+          <item><title>A</title><link>one</link></item>
+          <item xml:base="https://other.test/"><title>B</title><link>two</link></item>
+        </channel>
+      </rss>
+    `;
+    const feed = parseRss(parseXml(xml), "https://blog.test/feed.xml");
+
+    expect(feed.items[0].link).toBe("https://cdn.test/root/one");
+    expect(feed.items[1].link).toBe("https://other.test/two");
+  });
+
+  it("parses a feed with HTML entities XML does not define", () => {
+    const xml = `
+      <rss version="2.0">
+        <channel>
+          <title>a&nbsp;b &copy; 2024 &mdash; &amp; &#169;</title>
+          <item><title>x</title><description><![CDATA[keep &nbsp; raw]]></description></item>
+        </channel>
+      </rss>
+    `;
+    const feed = parseRss(parseXml(xml));
+
+    expect(feed.title).toBe("a\u00a0b \u00a9 2024 \u2014 & \u00a9");
+    expect(feed.items[0].content).toBe("keep &nbsp; raw");
+  });
 });
