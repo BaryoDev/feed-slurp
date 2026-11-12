@@ -1,5 +1,6 @@
 import { SlurpFeed, SlurpItem } from "../types";
 import { getCDataOrText, getText, findNode } from "./xml";
+import { toIsoDate } from "./date";
 
 export function parseRss(doc: Document): SlurpFeed {
     const channel = doc.querySelector("channel");
@@ -17,7 +18,7 @@ export function parseRss(doc: Document): SlurpFeed {
         return {
             title: getText(item, "title"),
             link: getText(item, "link"),
-            pubDate: new Date(getText(item, "pubDate")).toISOString(),
+            pubDate: toIsoDate(getText(item, "pubDate")),
             description,
             content,
             author: getText(item, "dc\\:creator") || getText(item, "author") || "Unknown",

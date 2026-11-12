@@ -61,4 +61,22 @@ describe("RSS Parser", () => {
     expect(feed.items[0].thumbnail).toBe("https://test.com/media.jpg");
     expect(feed.items[1].thumbnail).toBe("https://test.com/regex.jpg");
   });
+  it("should keep items with a missing or malformed date", () => {
+    const xml = `
+      <rss version="2.0">
+        <channel>
+          <title>Dates</title>
+          <item><title>Good</title><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item>
+          <item><title>Dateless</title></item>
+          <item><title>Malformed</title><pubDate>not a date</pubDate></item>
+        </channel>
+      </rss>
+    `;
+    const feed = parseRss(parseXml(xml));
+
+    expect(feed.items).toHaveLength(3);
+    expect(feed.items[0].pubDate).toBe("2024-01-01T00:00:00.000Z");
+    expect(feed.items[1].pubDate).toBeNull();
+    expect(feed.items[2].pubDate).toBeNull();
+  });
 });

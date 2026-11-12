@@ -1,5 +1,6 @@
 import { SlurpFeed, SlurpItem } from "../types";
 import { getText } from "./xml";
+import { toIsoDate } from "./date";
 
 export function parseAtom(doc: Document): SlurpFeed {
     const feed = doc.querySelector("feed");
@@ -11,7 +12,7 @@ export function parseAtom(doc: Document): SlurpFeed {
         return {
             title: getText(entry, "title"),
             link: entry.querySelector("link[rel='alternate']")?.getAttribute("href") || entry.querySelector("link")?.getAttribute("href") || "",
-            pubDate: new Date(getText(entry, "updated") || getText(entry, "published")).toISOString(),
+            pubDate: toIsoDate(getText(entry, "updated")) ?? toIsoDate(getText(entry, "published")),
             description: getText(entry, "summary"),
             content,
             author: getText(entry, "author name") || "Unknown",

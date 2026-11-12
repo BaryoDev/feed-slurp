@@ -39,4 +39,21 @@ describe("Atom Parser", () => {
         expect(item.pubDate).toBe("2024-01-01T12:00:00.000Z");
         expect(item.content).toBe("<p>Full</p>");
     });
+
+    it("should keep entries with a missing or malformed date", () => {
+        const xml = `
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Dates</title>
+          <entry><title>Good</title><updated>2024-01-01T12:00:00Z</updated></entry>
+          <entry><title>Dateless</title></entry>
+          <entry><title>Malformed</title><updated>not a date</updated></entry>
+        </feed>
+      `;
+        const feed = parseAtom(parseXml(xml));
+
+        expect(feed.items).toHaveLength(3);
+        expect(feed.items[0].pubDate).toBe("2024-01-01T12:00:00.000Z");
+        expect(feed.items[1].pubDate).toBeNull();
+        expect(feed.items[2].pubDate).toBeNull();
+    });
 });
