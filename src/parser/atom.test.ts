@@ -56,4 +56,16 @@ describe("Atom Parser", () => {
         expect(feed.items[1].pubDate).toBeNull();
         expect(feed.items[2].pubDate).toBeNull();
     });
+
+    it("should fall back to published when updated is malformed", () => {
+        const xml = `
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Dates</title>
+          <entry><title>Fallback</title><updated>not a date</updated><published>2024-01-01T10:00:00Z</published></entry>
+        </feed>
+      `;
+        const feed = parseAtom(parseXml(xml));
+
+        expect(feed.items[0].pubDate).toBe("2024-01-01T10:00:00.000Z");
+    });
 });
